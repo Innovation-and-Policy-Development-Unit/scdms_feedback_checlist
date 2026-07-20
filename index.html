@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SCDMS — System Feedback Checklist</title>
+<style>
+  :root {
+    --navy: #1F3864; --navy-deep: #142647; --ink: #1B1F27; --muted: #667085;
+    --line: #E3E7EE; --bg: #F5F6F9; --card: #FFFFFF;
+    --good: #2F9E64; --good-soft: #E4F5EB;
+    --needs: #C2860B; --needs-soft: #FBF0DA;
+    --missing: #C4433A; --missing-soft: #FBE7E5;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; background: var(--bg); }
+  .fb-root { background: var(--bg); color: var(--ink); padding: 24px 16px 70px; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  .fb-wrap { max-width: 860px; margin: 0 auto; }
+
+  .fb-config-warning {
+    background:#FBE7E5; border:1px solid #F0B3AC; color:#8F2E27; font-size:13px; font-weight:600;
+    padding:12px 16px; border-radius:10px; margin-bottom:16px; display:none;
+  }
+  .fb-conn-status { font-size:12px; font-weight:700; padding:5px 10px; border-radius:99px; display:inline-flex; align-items:center; gap:6px; }
+  .fb-conn-status.ok { background:var(--good-soft); color:#1E6B3E; }
+  .fb-conn-status.bad { background:var(--missing-soft); color:#8F2E27; }
+  .fb-conn-status.checking { background:#EEF0F4; color:var(--muted); }
+  .fb-dot { width:7px; height:7px; border-radius:50%; background:currentColor; }
+
+  .fb-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:14px; flex-wrap: wrap; }
+  .fb-eyebrow { text-transform:uppercase; letter-spacing:.14em; font-size:11px; font-weight:700; color:var(--navy); opacity:.75; margin:0 0 6px; }
+  .fb-title { font-size:24px; font-weight:800; letter-spacing:-.01em; margin:0 0 6px; color:var(--navy-deep); }
+  .fb-sub { font-size:13.5px; color:var(--muted); margin:0; max-width:56ch; line-height:1.5; }
+
+  .fb-tabs { display:flex; gap:4px; background:#EBEDF2; padding:4px; border-radius:10px; flex-shrink:0; }
+  .fb-tab { border:none; background:transparent; padding:8px 14px; font-size:13px; font-weight:600; color:var(--muted); border-radius:7px; cursor:pointer; white-space:nowrap; }
+  .fb-tab.active { background:var(--card); color:var(--navy-deep); box-shadow:0 1px 3px rgba(20,38,71,.12); }
+
+  .fb-card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px 18px 6px; margin-bottom:14px; }
+
+  .fb-fields { display:flex; gap:10px; flex-wrap:wrap; }
+  .fb-field { flex:1; min-width:150px; }
+  .fb-field label { font-size:12px; font-weight:700; color:var(--navy-deep); display:block; margin-bottom:5px; }
+  .fb-field input { width:100%; padding:8px 10px; border:1.5px solid var(--line); border-radius:8px; font-size:14px; outline:none; }
+  .fb-field input:focus { border-color:var(--navy); }
+
+  .fb-progress-bar { position:sticky; top:0; z-index:5; background:rgba(245,246,249,.94); backdrop-filter: blur(6px); padding:10px 0; margin-bottom:6px; border-bottom:1px solid var(--line); }
+  .fb-progress-inner { max-width:860px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .fb-progress-track { flex:1; min-width:120px; height:7px; background:#E3E7EE; border-radius:99px; overflow:hidden; }
+  .fb-progress-fill { height:100%; background:var(--navy); width:0%; transition:width .2s; }
+  .fb-progress-text { font-size:12.5px; font-weight:700; color:var(--navy-deep); white-space:nowrap; }
+  .fb-save-btn { background:var(--navy); color:#fff; border:none; padding:9px 16px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .fb-save-btn:hover { background:var(--navy-deep); }
+  .fb-save-btn:disabled { opacity:.55; cursor:not-allowed; }
+  .fb-save-btn.dirty { box-shadow: 0 0 0 3px rgba(31,56,100,.18); }
+  .fb-saved-note { font-size:11.5px; color:var(--muted); white-space:nowrap; }
+
+  details.fb-section { background:var(--card); border:1px solid var(--line); border-radius:14px; margin-bottom:12px; overflow:hidden; }
+  details.fb-section > summary { list-style:none; cursor:pointer; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  details.fb-section > summary::-webkit-details-marker { display:none; }
+  .fb-section-title { font-size:15.5px; font-weight:800; color:var(--navy-deep); }
+  .fb-section-note { font-size:12px; color:var(--muted); font-weight:500; margin-top:2px; }
+  .fb-chevron { transition: transform .15s; color:var(--muted); flex-shrink:0; }
+  details[open] .fb-chevron { transform: rotate(90deg); }
+
+  .fb-section-body { padding:0 18px 16px; border-top:1px solid var(--line); }
+
+  .fb-item { padding:16px 0; border-bottom:1px solid var(--line); }
+  .fb-item:last-child { border-bottom:none; }
+  .fb-item-text { font-size:14px; font-weight:600; color:var(--ink); margin:0 0 10px; line-height:1.4; }
+
+  .fb-pills { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+  .fb-pill { border:1.5px solid var(--line); background:var(--card); font-size:12px; font-weight:700; padding:6px 12px; border-radius:99px; cursor:pointer; color:var(--muted); transition: all .12s; }
+  .fb-pill:hover { border-color: #B9C0CC; }
+  .fb-pill[data-v="good"].sel { background:var(--good-soft); border-color:var(--good); color:#1E6B3E; }
+  .fb-pill[data-v="needs"].sel { background:var(--needs-soft); border-color:var(--needs); color:#8A5D08; }
+  .fb-pill[data-v="missing"].sel { background:var(--missing-soft); border-color:var(--missing); color:#8F2E27; }
+
+  .fb-row2 { display:flex; gap:10px; flex-wrap:wrap; }
+  .fb-comment-wrap { flex:1; min-width:220px; }
+  .fb-comment { width:100%; min-height:56px; resize:vertical; border:1.5px solid var(--line); border-radius:9px; padding:8px 10px; font-size:13px; font-family:inherit; outline:none; }
+  .fb-comment:focus { border-color:var(--navy); }
+
+  .fb-shot-wrap { width:220px; flex-shrink:0; }
+  .fb-shot-zone {
+    min-height:56px; border:1.5px dashed #C7CEDA; border-radius:9px; background:#FAFBFC;
+    display:flex; align-items:center; justify-content:center; text-align:center; padding:6px;
+    font-size:11px; color:var(--muted); cursor:pointer; position:relative; overflow:hidden;
+  }
+  .fb-shot-zone.has-img { border-style:solid; padding:0; }
+  .fb-shot-zone img { max-width:100%; max-height:120px; display:block; margin:0 auto; }
+  .fb-shot-remove {
+    position:absolute; top:4px; right:4px; background:rgba(20,38,71,.85); color:#fff; border:none;
+    width:20px; height:20px; border-radius:50%; font-size:12px; line-height:1; cursor:pointer; display:none;
+  }
+  .fb-shot-zone.has-img .fb-shot-remove { display:block; }
+  .fb-shot-zone.drag-over { border-color:var(--navy); background:var(--good-soft); }
+
+  .fb-open-item { padding:14px 0; }
+  .fb-open-label { font-size:13.5px; font-weight:700; color:var(--navy-deep); margin:0 0 8px; }
+
+  .fb-toolbar-top { display:flex; justify-content:flex-end; gap:8px; margin-bottom:12px; }
+  .fb-btn { border:1.5px solid var(--line); background:var(--card); color:var(--navy-deep); font-size:12.5px; font-weight:600; padding:7px 12px; border-radius:8px; cursor:pointer; }
+  .fb-btn:hover { border-color: var(--navy); }
+
+  .fb-saved-banner { background:var(--good-soft); color:#1E6B3E; border:1px solid #BFE6CE; padding:10px 14px; border-radius:10px; font-size:13px; font-weight:600; margin-bottom:14px; display:none; align-items:center; gap:8px; }
+  .fb-error-banner { background:var(--missing-soft); color:#8F2E27; border:1px solid #F0B3AC; padding:10px 14px; border-radius:10px; font-size:13px; font-weight:600; margin-bottom:14px; display:none; align-items:center; gap:8px; }
+
+  .fb-resp-card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px; margin-bottom:10px; }
+  .fb-resp-head { display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; }
+  .fb-resp-name { font-size:14.5px; font-weight:800; color:var(--navy-deep); }
+  .fb-resp-meta { font-size:12px; color:var(--muted); }
+  .fb-resp-stats { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+  .fb-stat { font-size:11px; font-weight:700; padding:3px 9px; border-radius:99px; }
+  .fb-stat.good { background:var(--good-soft); color:#1E6B3E; }
+  .fb-stat.needs { background:var(--needs-soft); color:#8A5D08; }
+  .fb-stat.missing { background:var(--missing-soft); color:#8F2E27; }
+  .fb-stat.neutral { background:#EEF0F4; color:var(--muted); }
+  .fb-resp-detail { display:none; margin-top:14px; border-top:1px solid var(--line); padding-top:12px; }
+  .fb-resp-detail.open { display:block; }
+
+  .fb-empty { text-align:center; padding:40px 20px; color:var(--muted); font-size:14px; }
+  .fb-foot-note { font-size:11.5px; color:var(--muted); text-align:center; margin-top:22px; }
+  .fb-csv-link { font-size:12px; }
+  .fb-csv-link a { color: var(--navy); font-weight:700; }
+
+  @media (max-width:560px) {
+    .fb-title { font-size:20px; }
+    .fb-row2 { flex-direction:column; }
+    .fb-shot-wrap { width:100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="fb-root">
+  <div class="fb-wrap">
+
+    <!-- ============================================================
+         SETUP — edit these four values before publishing to GitHub Pages.
+         See the README / setup notes at the bottom of this file for
+         step-by-step instructions on creating the token and repo.
+         ============================================================ -->
+    <script>
+      window.GH_CONFIG = {
+        owner:  "REPLACE_ME_OWNER",     // your GitHub username or org, e.g. "Innovation-and-Policy-Development-Unit"
+        repo:   "REPLACE_ME_REPO",      // the repo this site lives in, e.g. "scdms-feedback"
+        branch: "main",                 // the branch GitHub Pages serves from
+        token:  "REPLACE_ME_TOKEN",     // fine-grained PAT, scoped to ONLY this repo, Contents: Read & write
+        csvPath: "responses/feedback.csv",
+        screenshotDir: "responses/screenshots"
+      };
+    </script>
+
+    <div id="fbConfigWarning" class="fb-config-warning">
+      ⚠️ This page hasn't been configured yet. Open <code>index.html</code>, find the <code>GH_CONFIG</code> block near the top, and fill in your GitHub username/org, repo name, and a fine-grained personal access token before publishing.
+    </div>
+
+    <div class="fb-head">
+      <div>
+        <p class="fb-eyebrow">SCDMS Pre-Pilot Review</p>
+        <h1 class="fb-title">System Feedback Checklist</h1>
+        <p class="fb-sub">Work through each section, rate the items, and add a comment or screenshot anywhere it helps explain what you mean. Save anytime — responses are written straight into this repo.</p>
+        <div id="fbConnStatus" class="fb-conn-status checking"><span class="fb-dot"></span> Checking connection…</div>
+      </div>
+      <div class="fb-tabs">
+        <button class="fb-tab active" id="fbTabFillBtn">Fill out</button>
+        <button class="fb-tab" id="fbTabTeamBtn">Team responses</button>
+      </div>
+    </div>
+
+    <div id="fbFillView">
+      <div id="fbSavedBanner" class="fb-saved-banner">✓ <span id="fbSavedText">Saved.</span></div>
+      <div id="fbErrorBanner" class="fb-error-banner">⚠️ <span id="fbErrorText">Something went wrong.</span></div>
+
+      <div class="fb-card">
+        <div class="fb-fields">
+          <div class="fb-field"><label>Name</label><input type="text" id="fbName" placeholder="e.g. Kalo Napuat" autocomplete="off"/></div>
+          <div class="fb-field"><label>Unit</label><input type="text" id="fbUnit" placeholder="VIPAM / HR / ODU / Compliance" autocomplete="off"/></div>
+          <div class="fb-field"><label>Date</label><input type="date" id="fbDate"/></div>
+        </div>
+      </div>
+
+      <div class="fb-progress-bar">
+        <div class="fb-progress-inner">
+          <div class="fb-progress-text"><span id="fbProgNum">0</span>/<span id="fbProgTotal">0</span> items rated</div>
+          <div class="fb-progress-track"><div class="fb-progress-fill" id="fbProgFill"></div></div>
+          <span class="fb-saved-note" id="fbSavedNote">Not saved yet</span>
+          <button class="fb-save-btn" id="fbSaveBtn">Save my feedback</button>
+        </div>
+      </div>
+
+      <div class="fb-toolbar-top">
+        <button class="fb-btn" id="fbExpandAllBtn">Expand all</button>
+        <button class="fb-btn" id="fbCollapseAllBtn">Collapse all</button>
+      </div>
+
+      <div id="fbSections"></div>
+    </div>
+
+    <div id="fbTeamView" style="display:none;">
+      <div class="fb-card" style="padding:14px 16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+          <div class="fb-progress-text"><span id="fbTeamCount">0</span> responses submitted</div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span class="fb-csv-link" id="fbCsvLink"></span>
+            <button class="fb-btn" id="fbRefreshBtn">Refresh</button>
+          </div>
+        </div>
+      </div>
+      <div id="fbTeamList"></div>
+    </div>
+
+    <p class="fb-foot-note">SCDMS · feedback checklist · responses are committed to <span id="fbRepoLabel">this repo</span></p>
+  </div>
+</div>
+
+<script>
+(function () {
+  const CFG = window.GH_CONFIG;
+  const CONFIGURED = CFG.owner !== "REPLACE_ME_OWNER" && CFG.repo !== "REPLACE_ME_REPO" && CFG.token !== "REPLACE_ME_TOKEN";
+
+  const SECTIONS = [
+    { id:"s1", title:"1. Overall Workflow & Clarity", note:"the big picture, before individual screens", items:[
+      "The end-to-end lifecycle (submission → your unit's review → assessment → commission sitting → decision → implementation) makes sense as a whole",
+      "Stage names and terminology match how PSC actually talks about the process",
+      "It's clear at every stage whose responsibility a submission currently is",
+      "The distinction between similar stages (e.g. 'returned for clarification' vs 'rejected') is clear"
+    ]},
+    { id:"s2", title:"2. Submission Intake & Routing", note:"ministry submits → received by PSC → reaches your unit", items:[
+      "Submissions are routed to your unit correctly, without manual correction",
+      "The submission detail screen shows enough context to understand what is being requested",
+      "Attached documents open, display, and download correctly",
+      "It's clear which submissions are new / awaiting your review vs. already actioned"
+    ]},
+    { id:"s3", title:"3. Checklist Review (Your Manager Gate)", note:"manager_checklist_review stage", items:[
+      "The checklist review step covers everything your unit actually checks manually today",
+      "Required documents are validated correctly before a submission can proceed",
+      "You can return a submission for clarification with a clear, recorded reason",
+      "It's clear who a submission gets assigned to (which Principal) after it passes your review",
+      "Notifications alert you promptly when something needs your review"
+    ]},
+    { id:"s4", title:"4. Assignment to Unit Principals & Assessment Tracking", note:"under_assessment stage", items:[
+      "Assigning a submission to a Principal in your unit is quick and unambiguous",
+      "You can see the status/progress of submissions assigned to your Principals at a glance",
+      "Reassignment (e.g. if someone is on leave/unavailable) is possible without losing history",
+      "Deferred, tabled, or escalated (legal advice / Cabinet decision) items are clearly distinguishable from active work",
+      "Escalation paths (legal advice, Cabinet, etc.) match how these are actually handled today"
+    ]},
+    { id:"s5", title:"5. PSC Forms Your Unit Uses", note:"digitized forms, e.g. Form 5-1, Form 2-1/2-2", items:[
+      "Digitized PSC forms your unit works with match the paper versions you know",
+      "Required fields catch incomplete submissions before they reach you",
+      "Multi-page / sectioned forms are easy to read and navigate",
+      "It's clear if/when a paper form still needs to be used as a fallback"
+    ]},
+    { id:"s6", title:"6. Documents & Sign-Off", items:[
+      "Viewing and reviewing supporting documents is straightforward",
+      "Annotating documents (comments, markup) works as expected for your review process",
+      "Digital signatures are clear and trustworthy for formal sign-off",
+      "It's clear when a document has been replaced or updated"
+    ]},
+    { id:"s7", title:"7. Commission Sitting & Decision Outcomes", note:"visibility after your unit's part is done", items:[
+      "You can see when a submission from your unit reaches commission sitting",
+      "The outcome (approved / rejected / returned / deferred back to HR / matters arising) is clearly recorded and visible to your unit",
+      "Signed minutes are accessible to those in your unit who need to act on them",
+      "Your unit is notified promptly once a decision is made"
+    ]},
+    { id:"s8", title:"8. Post-Decision Implementation Tracking", items:[
+      "Tasks arising from a decision that affect your unit are clearly assigned and trackable",
+      "Status updates give a realistic picture of implementation progress",
+      "It's clear when an implementation report is due and who owns producing it",
+      "Your unit can see whether earlier decisions affecting it were actually implemented"
+    ]},
+    { id:"s9", title:"9. Notifications & Communication", items:[
+      "In-app notifications are timely and relevant (not too noisy, not too quiet)",
+      "Email notifications, where used, arrive reliably and contain enough context",
+      "It's easy to tell what action a notification requires, if any",
+      "Nothing important currently relies on someone remembering to check manually"
+    ]},
+    { id:"s10", title:"10. Your Unit's Dashboard, Reports & Search", items:[
+      "The dashboard gives a useful at-a-glance view of your unit's workload",
+      "Reports reflect the figures your unit would actually need for its own reporting",
+      "Search finds submissions reliably by name, reference number, or keyword",
+      "Filtering (by stage, date range, etc.) is sufficient for your unit's day-to-day needs"
+    ]},
+    { id:"s11", title:"11. Login & Everyday Access", items:[
+      "Logging in, including two-factor authentication (if enabled), is manageable for your staff",
+      "Your unit only sees the submissions and data it should — nothing more, nothing less",
+      "Password reset / account recovery works and is easy to find if someone gets locked out",
+      "You would trust the system's record of who did what, if something needed to be traced back"
+    ]},
+    { id:"s12", title:"12. General Usability & Training Needs", items:[
+      "Overall navigation and layout are clear without training",
+      "Wording, labels, and terminology throughout feel natural, not overly technical or ambiguous",
+      "The system is usable on the devices/browsers your unit actually has",
+      "Your staff would need dedicated training before going live, beyond a short walkthrough"
+    ]},
+    { id:"s13", title:"13. What's Missing?", note:"anything not covered above", open:true, items:[
+      "Features, steps, checks, or reports your unit needs that you did not see in the system today"
+    ]},
+    { id:"s14", title:"14. Before We Pilot", note:"up to three must-fix items, in priority order", open:true, items:[
+      "Priority 1 — the single most important thing to fix before pilot",
+      "Priority 2",
+      "Priority 3"
+    ]}
+  ];
+
+  const RATING_LABELS = { good: "Works well", needs: "Needs work", missing: "Missing / N/A" };
+  const CSV_HEADERS = ["timestamp","name","unit","date","section","item_id","item","rating","comment","screenshot_path"];
+
+  // ---------- State ----------
+  let responses = {};
+  let totalRatingItems = 0;
+  let dirty = false;
+
+  SECTIONS.forEach(sec => {
+    sec.items.forEach((_, idx) => {
+      const id = sec.id + "-i" + idx;
+      responses[id] = { rating: null, comment: "", screenshot: null };
+      if (!sec.open) totalRatingItems++;
+    });
+  });
+
+  const $ = (sel, root) => (root || document).querySelector(sel);
+  const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+
+  function slugify(name) {
+    return (name||"").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  }
+
+  function showError(msg) {
+    $("#fbErrorText").textContent = msg;
+    $("#fbErrorBanner").style.display = "flex";
+    setTimeout(() => { $("#fbErrorBanner").style.display = "none"; }, 7000);
+  }
+
+  // ---------- base64 helpers (UTF-8 safe) ----------
+  function b64encode(str) { return btoa(unescape(encodeURIComponent(str))); }
+  function b64decode(str) { return decodeURIComponent(escape(atob(str))); }
+
+  // ---------- GitHub Contents API ----------
+  async function ghGet(path) {
+    const url = "https://api.github.com/repos/" + CFG.owner + "/" + CFG.repo + "/contents/" + path + "?ref=" + CFG.branch + "&t=" + Date.now();
+    const res = await fetch(url, {
+      headers: { "Authorization": "Bearer " + CFG.token, "Accept": "application/vnd.github+json" }
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error("GitHub read failed (" + res.status + ")");
+    const json = await res.json();
+    return { content: b64decode(json.content.replace(/\n/g, "")), sha: json.sha };
+  }
+
+  async function ghPut(path, base64Content, message, sha) {
+    const url = "https://api.github.com/repos/" + CFG.owner + "/" + CFG.repo + "/contents/" + path;
+    const body = { message: message, content: base64Content, branch: CFG.branch };
+    if (sha) body.sha = sha;
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: { "Authorization": "Bearer " + CFG.token, "Accept": "application/vnd.github+json", "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error("GitHub write failed (" + res.status + "): " + t.slice(0,200));
+    }
+    return res.json();
+  }
+
+  async function checkConnection() {
+    const el = $("#fbConnStatus");
+    if (!CONFIGURED) {
+      $("#fbConfigWarning").style.display = "block";
+      el.className = "fb-conn-status bad";
+      el.innerHTML = '<span class="fb-dot"></span> Not configured';
+      return;
+    }
+    $("#fbRepoLabel").textContent = CFG.owner + "/" + CFG.repo;
+    try {
+      const res = await fetch("https://api.github.com/repos/" + CFG.owner + "/" + CFG.repo, {
+        headers: { "Authorization": "Bearer " + CFG.token, "Accept": "application/vnd.github+json" }
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      el.className = "fb-conn-status ok";
+      el.innerHTML = '<span class="fb-dot"></span> Connected to ' + CFG.owner + "/" + CFG.repo;
+      $("#fbCsvLink").innerHTML = '<a href="https://github.com/' + CFG.owner + '/' + CFG.repo + '/blob/' + CFG.branch + '/' + CFG.csvPath + '" target="_blank">View feedback.csv on GitHub →</a>';
+    } catch (e) {
+      el.className = "fb-conn-status bad";
+      el.innerHTML = '<span class="fb-dot"></span> Can\'t reach repo — check token/owner/repo';
+    }
+  }
+
+  // ---------- CSV ----------
+  function csvEscape(v) {
+    v = (v == null ? "" : String(v));
+    if (/[",\n\r]/.test(v)) return '"' + v.replace(/"/g, '""') + '"';
+    return v;
+  }
+  function rowsToCSV(rows) {
+    const lines = [CSV_HEADERS.join(",")];
+    rows.forEach(r => lines.push(CSV_HEADERS.map(h => csvEscape(r[h])).join(",")));
+    return lines.join("\r\n");
+  }
+  function parseCSV(text) {
+    const rows = []; let i = 0, field = "", row = [], inQuotes = false;
+    const pushField = () => { row.push(field); field = ""; };
+    const pushRow = () => { pushField(); rows.push(row); row = []; };
+    while (i < text.length) {
+      const c = text[i];
+      if (inQuotes) {
+        if (c === '"') { if (text[i+1] === '"') { field += '"'; i += 2; continue; } inQuotes = false; i++; continue; }
+        field += c; i++; continue;
+      } else {
+        if (c === '"') { inQuotes = true; i++; continue; }
+        if (c === ',') { pushField(); i++; continue; }
+        if (c === '\r') { i++; continue; }
+        if (c === '\n') { pushRow(); i++; continue; }
+        field += c; i++; continue;
+      }
+    }
+    if (field.length || row.length) pushRow();
+    if (!rows.length) return [];
+    const headers = rows[0];
+    return rows.slice(1)
+      .filter(r => r.length === headers.length && r.some(x => x !== ""))
+      .map(r => { const obj = {}; headers.forEach((h, idx) => obj[h] = r[idx]); return obj; });
+  }
+
+  // ---------- Image handling ----------
+  function resizeImage(file, cb) {
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      const img = new Image();
+      img.onload = function () {
+        const maxW = 720;
+        const scale = Math.min(1, maxW / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        cb(canvas.toDataURL("image/jpeg", 0.68));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function wireShotZone(zone, itemId, onChange) {
+    function setImage(dataUrl) {
+      responses[itemId].screenshot = dataUrl;
+      zone.classList.add("has-img");
+      zone.innerHTML = '<img src="' + dataUrl + '"/><button type="button" class="fb-shot-remove">×</button>';
+      $(".fb-shot-remove", zone).addEventListener("click", (e) => {
+        e.stopPropagation();
+        responses[itemId].screenshot = null;
+        zone.classList.remove("has-img");
+        zone.innerHTML = "🖼 Paste (Ctrl+V) or click to add a screenshot";
+        onChange();
+      });
+      onChange();
+    }
+    if (responses[itemId].screenshot) setImage(responses[itemId].screenshot);
+
+    zone.addEventListener("click", () => {
+      if (zone.classList.contains("has-img")) return;
+      const input = document.createElement("input");
+      input.type = "file"; input.accept = "image/*";
+      input.onchange = () => { if (input.files[0]) resizeImage(input.files[0], setImage); };
+      input.click();
+    });
+    zone.addEventListener("paste", (e) => {
+      const items = (e.clipboardData || window.clipboardData).items;
+      for (const it of items) {
+        if (it.type.indexOf("image") === 0) { resizeImage(it.getAsFile(), setImage); e.preventDefault(); return; }
+      }
+    });
+    zone.setAttribute("tabindex", "0");
+    ["dragover","dragenter"].forEach(evt => zone.addEventListener(evt, (e) => { e.preventDefault(); zone.classList.add("drag-over"); }));
+    ["dragleave","drop"].forEach(evt => zone.addEventListener(evt, (e) => { e.preventDefault(); zone.classList.remove("drag-over"); }));
+    zone.addEventListener("drop", (e) => {
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.indexOf("image") === 0) resizeImage(file, setImage);
+    });
+  }
+
+  // ---------- Render fill form ----------
+  function markDirty() {
+    dirty = true;
+    $("#fbSaveBtn").classList.add("dirty");
+    $("#fbSavedNote").textContent = "Unsaved changes";
+    updateProgress();
+  }
+
+  function updateProgress() {
+    let n = 0;
+    SECTIONS.forEach(sec => { if (!sec.open) sec.items.forEach((_, idx) => { if (responses[sec.id + "-i" + idx].rating) n++; }); });
+    $("#fbProgNum").textContent = n;
+    $("#fbProgTotal").textContent = totalRatingItems;
+    $("#fbProgFill").style.width = (totalRatingItems ? (n / totalRatingItems * 100) : 0) + "%";
+  }
+
+  function renderSections() {
+    const container = $("#fbSections");
+    container.innerHTML = "";
+    SECTIONS.forEach((sec, si) => {
+      const det = document.createElement("details");
+      det.className = "fb-section";
+      if (si === 0) det.open = true;
+
+      const summary = document.createElement("summary");
+      summary.innerHTML =
+        '<div><div class="fb-section-title">' + sec.title + '</div>' +
+        (sec.note ? '<div class="fb-section-note">' + sec.note + '</div>' : '') + '</div>' +
+        '<svg class="fb-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>';
+      det.appendChild(summary);
+
+      const body = document.createElement("div");
+      body.className = "fb-section-body";
+
+      sec.items.forEach((text, idx) => {
+        const itemId = sec.id + "-i" + idx;
+        const item = document.createElement("div");
+
+        if (sec.open) {
+          item.className = "fb-open-item";
+          item.innerHTML = '<p class="fb-open-label">' + text + '</p>';
+        } else {
+          item.className = "fb-item";
+          item.innerHTML = '<p class="fb-item-text">' + text + '</p>' +
+            '<div class="fb-pills">' +
+              '<button type="button" class="fb-pill" data-v="good">Works well</button>' +
+              '<button type="button" class="fb-pill" data-v="needs">Needs work</button>' +
+              '<button type="button" class="fb-pill" data-v="missing">Missing / N/A</button>' +
+            '</div>';
+        }
+
+        const row = document.createElement("div");
+        row.className = "fb-row2";
+        const cWrap = document.createElement("div");
+        cWrap.className = "fb-comment-wrap";
+        const ta = document.createElement("textarea");
+        ta.className = "fb-comment";
+        ta.placeholder = "Comment (optional)...";
+        ta.value = responses[itemId].comment || "";
+        ta.addEventListener("input", () => { responses[itemId].comment = ta.value; markDirty(); });
+        cWrap.appendChild(ta);
+
+        const sWrap = document.createElement("div");
+        sWrap.className = "fb-shot-wrap";
+        const zone = document.createElement("div");
+        zone.className = "fb-shot-zone";
+        zone.innerHTML = "🖼 Paste (Ctrl+V) or click to add a screenshot";
+        sWrap.appendChild(zone);
+        wireShotZone(zone, itemId, markDirty);
+
+        row.appendChild(cWrap); row.appendChild(sWrap);
+        item.appendChild(row);
+
+        if (!sec.open) {
+          $$(".fb-pill", item).forEach(btn => {
+            if (responses[itemId].rating === btn.dataset.v) btn.classList.add("sel");
+            btn.addEventListener("click", () => {
+              const v = btn.dataset.v;
+              responses[itemId].rating = responses[itemId].rating === v ? null : v;
+              $$(".fb-pill", item).forEach(b => b.classList.toggle("sel", b.dataset.v === responses[itemId].rating));
+              markDirty();
+            });
+          });
+        }
+        body.appendChild(item);
+      });
+      det.appendChild(body);
+      container.appendChild(det);
+    });
+  }
+
+  $("#fbExpandAllBtn").addEventListener("click", () => $$(".fb-section").forEach(d => d.open = true));
+  $("#fbCollapseAllBtn").addEventListener("click", () => $$(".fb-section").forEach(d => d.open = false));
+
+  // ---------- Load existing (from CSV in repo) ----------
+  async function loadExisting() {
+    if (!CONFIGURED) return;
+    const name = $("#fbName").value.trim();
+    if (!name) return;
+    const slug = slugify(name);
+    try {
+      const file = await ghGet(CFG.csvPath);
+      if (!file) return;
+      const rows = parseCSV(file.content).filter(r => slugify(r.name) === slug);
+      if (!rows.length) return;
+      $("#fbUnit").value = rows[0].unit || "";
+      $("#fbDate").value = rows[0].date || "";
+      rows.forEach(r => {
+        if (!responses[r.item_id]) return;
+        responses[r.item_id] = {
+          rating: r.rating || null,
+          comment: r.comment || "",
+          screenshot: r.screenshot_path || null
+        };
+      });
+      renderSections();
+      updateProgress();
+      $("#fbSavedNote").textContent = "Loaded your saved responses";
+    } catch (e) { showError("Couldn't load your previous responses: " + e.message); }
+  }
+  $("#fbName").addEventListener("change", loadExisting);
+
+  // ---------- Save ----------
+  async function uploadScreenshotIfNeeded(itemId, value, slug) {
+    if (!value) return "";
+    if (value.indexOf("http") === 0) return value; // already hosted, unchanged
+    const path = CFG.screenshotDir + "/" + slug + "/" + itemId + ".jpg";
+    const base64 = value.split(",")[1];
+    let existingSha;
+    try { const existing = await ghGet(path); if (existing) existingSha = existing.sha; } catch (e) {}
+    await ghPut(path, base64, "Screenshot: " + slug + " / " + itemId, existingSha);
+    return "https://raw.githubusercontent.com/" + CFG.owner + "/" + CFG.repo + "/" + CFG.branch + "/" + path;
+  }
+
+  $("#fbSaveBtn").addEventListener("click", async () => {
+    if (!CONFIGURED) { showError("This page isn't configured yet — see the setup notes."); return; }
+    const name = $("#fbName").value.trim();
+    if (!name) { $("#fbName").focus(); return; }
+    const unit = $("#fbUnit").value.trim();
+    const date = $("#fbDate").value;
+    const slug = slugify(name);
+    const btn = $("#fbSaveBtn");
+    btn.disabled = true; btn.textContent = "Uploading screenshots…";
+
+    try {
+      const timestamp = new Date().toISOString();
+      const rows = [];
+      for (const sec of SECTIONS) {
+        for (let idx = 0; idx < sec.items.length; idx++) {
+          const itemId = sec.id + "-i" + idx;
+          const r = responses[itemId];
+          if (!r.rating && !r.comment && !r.screenshot) continue;
+          const shotUrl = await uploadScreenshotIfNeeded(itemId, r.screenshot, slug);
+          rows.push({
+            timestamp: timestamp, name: name, unit: unit, date: date,
+            section: sec.title, item_id: itemId, item: sec.items[idx],
+            rating: r.rating || "", comment: (r.comment || "").replace(/\r?\n/g, " "),
+            screenshot_path: shotUrl
+          });
+        }
+      }
+
+      btn.textContent = "Updating CSV…";
+      const existing = await ghGet(CFG.csvPath);
+      let existingRows = [], sha;
+      if (existing) { existingRows = parseCSV(existing.content); sha = existing.sha; }
+      const kept = existingRows.filter(r => slugify(r.name) !== slug);
+      const allRows = kept.concat(rows);
+      const csvText = rowsToCSV(allRows);
+      await ghPut(CFG.csvPath, b64encode(csvText), "Feedback: " + name + (unit ? " (" + unit + ")" : ""), sha);
+
+      dirty = false;
+      btn.classList.remove("dirty");
+      $("#fbSavedNote").textContent = "Saved just now";
+      $("#fbSavedText").textContent = "Saved — thanks " + name + "! Come back anytime to update this.";
+      $("#fbSavedBanner").style.display = "flex";
+      setTimeout(() => { $("#fbSavedBanner").style.display = "none"; }, 4500);
+    } catch (e) {
+      showError("Save failed: " + e.message);
+      $("#fbSavedNote").textContent = "Save failed — try again";
+    }
+    btn.disabled = false; btn.textContent = "Save my feedback";
+  });
+
+  window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+  // ---------- Team view ----------
+  function renderReadOnlyItem(text, itemId, data) {
+    const r = data.byItem[itemId] || {};
+    const isOpen = itemId.indexOf("s13") === 0 || itemId.indexOf("s14") === 0;
+    const item = document.createElement("div");
+    item.className = isOpen ? "fb-open-item" : "fb-item";
+    let html = '<p class="' + (isOpen ? "fb-open-label" : "fb-item-text") + '">' + text + '</p>';
+    if (!isOpen) {
+      html += '<div class="fb-pills">';
+      ["good","needs","missing"].forEach(v => {
+        html += '<span class="fb-pill' + (r.rating === v ? " sel" : "") + '" style="cursor:default;">' + RATING_LABELS[v] + '</span>';
+      });
+      html += '</div>';
+    }
+    if (r.comment) html += '<p style="font-size:13px; color:var(--ink); background:#F7F8FA; border-radius:8px; padding:8px 10px; margin:6px 0 0;">' + String(r.comment).replace(/</g,"&lt;") + '</p>';
+    if (r.screenshot_path) html += '<img src="' + r.screenshot_path + '" style="max-width:260px; border-radius:8px; margin-top:8px; border:1px solid var(--line);"/>';
+    item.innerHTML = html;
+    return item;
+  }
+
+  async function loadAllResponses() {
+    const file = await ghGet(CFG.csvPath);
+    if (!file) return [];
+    const rows = parseCSV(file.content);
+    const byName = {};
+    rows.forEach(r => {
+      const slug = slugify(r.name);
+      if (!byName[slug]) byName[slug] = { name: r.name, unit: r.unit, date: r.date, byItem: {} };
+      byName[slug].byItem[r.item_id] = r;
+    });
+    return Object.values(byName);
+  }
+
+  async function renderTeamView() {
+    if (!CONFIGURED) {
+      $("#fbTeamList").innerHTML = '<div class="fb-empty">Not configured yet — see the setup notes in the file.</div>';
+      return;
+    }
+    let all;
+    try { all = await loadAllResponses(); }
+    catch (e) { $("#fbTeamList").innerHTML = '<div class="fb-empty">Couldn\'t load responses: ' + e.message + '</div>'; return; }
+
+    $("#fbTeamCount").textContent = all.length;
+    const list = $("#fbTeamList");
+    list.innerHTML = "";
+    if (!all.length) { list.innerHTML = '<div class="fb-empty">No responses submitted yet.</div>'; return; }
+
+    all.forEach(data => {
+      let good=0, needs=0, missing=0, comments=0, shots=0;
+      Object.values(data.byItem).forEach(r => {
+        if (r.rating === "good") good++;
+        if (r.rating === "needs") needs++;
+        if (r.rating === "missing") missing++;
+        if (r.comment) comments++;
+        if (r.screenshot_path) shots++;
+      });
+
+      const card = document.createElement("div");
+      card.className = "fb-resp-card";
+      card.innerHTML =
+        '<div class="fb-resp-head">' +
+          '<div><div class="fb-resp-name">' + data.name + (data.unit ? ' <span class="fb-resp-meta">· ' + data.unit + '</span>' : '') + '</div>' +
+          '<div class="fb-resp-meta">' + (data.date || "") + '</div>' +
+          '<div class="fb-resp-stats">' +
+            '<span class="fb-stat good">' + good + ' works well</span>' +
+            '<span class="fb-stat needs">' + needs + ' needs work</span>' +
+            '<span class="fb-stat missing">' + missing + ' missing</span>' +
+            '<span class="fb-stat neutral">' + comments + ' comments</span>' +
+            '<span class="fb-stat neutral">' + shots + ' screenshots</span>' +
+          '</div></div>' +
+          '<svg class="fb-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>' +
+        '</div>' +
+        '<div class="fb-resp-detail"></div>';
+
+      const detail = $(".fb-resp-detail", card);
+      SECTIONS.forEach(sec => {
+        const secHead = document.createElement("div");
+        secHead.style.cssText = "font-size:13px; font-weight:800; color:var(--navy-deep); margin:14px 0 4px;";
+        secHead.textContent = sec.title;
+        detail.appendChild(secHead);
+        sec.items.forEach((text, idx) => detail.appendChild(renderReadOnlyItem(text, sec.id + "-i" + idx, data)));
+      });
+
+      $(".fb-resp-head", card).addEventListener("click", () => {
+        detail.classList.toggle("open");
+        $(".fb-chevron", card).style.transform = detail.classList.contains("open") ? "rotate(90deg)" : "";
+      });
+      list.appendChild(card);
+    });
+  }
+
+  // ---------- Tabs ----------
+  $("#fbTabFillBtn").addEventListener("click", () => {
+    $("#fbTabFillBtn").classList.add("active"); $("#fbTabTeamBtn").classList.remove("active");
+    $("#fbFillView").style.display = ""; $("#fbTeamView").style.display = "none";
+  });
+  $("#fbTabTeamBtn").addEventListener("click", () => {
+    $("#fbTabTeamBtn").classList.add("active"); $("#fbTabFillBtn").classList.remove("active");
+    $("#fbFillView").style.display = "none"; $("#fbTeamView").style.display = "";
+    renderTeamView();
+  });
+  $("#fbRefreshBtn").addEventListener("click", renderTeamView);
+
+  // ---------- Init ----------
+  renderSections();
+  updateProgress();
+  $("#fbDate").value = new Date().toISOString().slice(0,10);
+  checkConnection();
+})();
+</script>
+
+<!-- ==========================================================================
+SETUP NOTES (read this before publishing)
+
+1. CREATE THE REPO
+   - Create a new GitHub repo, e.g. "scdms-feedback". Public repos make screenshot
+     images viewable via raw.githubusercontent.com without extra auth — recommended
+     unless your feedback is sensitive enough to require a private repo.
+
+2. CREATE A FINE-GRAINED PERSONAL ACCESS TOKEN
+   - GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token
+   - Resource owner: your account/org
+   - Repository access: "Only select repositories" → pick just this repo
+   - Permissions: Repository → Contents → Read and write. Nothing else.
+   - Set an expiry (e.g. 30 or 90 days — matches your review window). Copy the token now, you won't see it again.
+
+   ⚠️ This token will be visible to anyone who views this page's source or opens
+   browser dev tools. That's expected for a static site with no backend — it's why
+   the token is scoped to ONLY this repo with ONLY Contents read/write. Delete or
+   rotate it once the review period is over.
+
+3. EDIT THE CONFIG AT THE TOP OF THIS FILE
+   - Set owner, repo, branch, and token in the GH_CONFIG block above.
+
+4. PUBLISH
+   - Commit this file as index.html at the repo root (or /docs, your choice).
+   - Repo → Settings → Pages → set source to your branch/folder → Save.
+   - Your form will be live at https://<owner>.github.io/<repo>/
+
+5. WHAT GETS WRITTEN TO THE REPO
+   - responses/feedback.csv       — one row per answered item, long format:
+       timestamp, name, unit, date, section, item_id, item, rating, comment, screenshot_path
+   - responses/screenshots/<slug>/<item_id>.jpg — any pasted screenshots
+
+   Re-submitting (same name) replaces that person's previous rows rather than
+   duplicating them.
+========================================================================== -->
+
+</body>
+</html>
